@@ -2,8 +2,11 @@
 #include <Windows.h>
 #include <iostream>
 #include <string>
+#include <TlHelp32.h>
 using namespace std;
-
+#define WDLL_NAME L"hookdll.dll"
+#define DLL_NAME hookdll.dll
+#define PDLL_NAME L"\\hookdll.dll"
 class Hooker
 { 
 private:
