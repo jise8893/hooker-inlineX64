@@ -2,6 +2,9 @@
 #include "pch.h"
 #include <cstdio>
 #include <cstdint>
+
+BYTE originBuffer[6] = { 0, };
+
 void pack_little_endian(uint64_t& value, uint8_t* buffer) {
     for (int i = 0; i < 8; i++) {
         buffer[i] = (uint8_t)(value & 0xFF);
@@ -25,7 +28,7 @@ static BOOL(WINAPI* OriginalWriteFile)(
     DWORD nNumberOfBytesToWrite,
     LPDWORD lpNumberOfBytesWritten,
     LPOVERLAPPED lpOverlapped
-    )=WriteFile;
+    )=nullptr;
 
 // 후킹할 WriteFile 함수
 extern "C" __declspec(dllexport) BOOL WINAPI HookedWriteFile(
@@ -34,17 +37,7 @@ extern "C" __declspec(dllexport) BOOL WINAPI HookedWriteFile(
     DWORD nNumberOfBytesToWrite,
     LPDWORD lpNumberOfBytesWritten,
     LPOVERLAPPED lpOverlapped
-)
-{
-    // 원하는 동작 수행
-    MessageBox(NULL, L"Hooked WriteFile!", L"Hook Message", MB_OK);
-
-    // 원본 WriteFile 함수 호출
-    return OriginalWriteFile(hFile, lpBuffer, nNumberOfBytesToWrite, lpNumberOfBytesWritten, lpOverlapped);
-}
-
-
-
+);
 
 
 
@@ -69,12 +62,15 @@ BOOL APIENTRY DllMain( HMODULE hModule,
            MessageBox(NULL, TEXT, NULL, NULL); 
            
        }
+      
 
        BYTE shellCodeStart[] = { 0x48,0xB8 };// MOV RAX , XXX (주소 8바이트)
        BYTE shellCodeEnd[] = { 0xFF,0xE0 }; //jmp RAX  명령어 총 4바이트 합 12바이트
        BYTE originByte[12] = { 0, };
        memcpy(originByte, shellCodeStart, sizeof(shellCodeStart));
-       OriginalWriteFile = (BOOL(WINAPI*)(HANDLE, LPCVOID, DWORD, LPDWORD, LPOVERLAPPED))GetProcAddress(hMod, "WriteFile"); 
+       
+       
+
        //HookedWriteFile
        uint64_t value = (uint64_t) & HookedWriteFile;
        uint8_t buffer[8];
@@ -85,16 +81,30 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 
        DWORD oldProtect;
 
+
+       uint32_t rvaValue = 0;
+       uint8_t rvaBuffer[4] = { 0, };
+
+
+       memcpy(originBuffer, (char*)functionAddress , sizeof(originBuffer)); 
+      
+
+
+
        if (VirtualProtect(functionAddress, (SIZE_T)12, PAGE_EXECUTE_READWRITE, &oldProtect) == FALSE)
        {
            TCHAR TEXT[100];
            wsprintf(TEXT, L"VirtualProtect Error %d", GetLastError()); 
            MessageBox(NULL, TEXT, NULL, NULL);
        }
+
        if (WriteProcessMemory(GetCurrentProcess(), functionAddress, originByte, sizeof(originByte), NULL))
        {
            MessageBox(NULL,L"WriteProcessMemory Successed", NULL, NULL);
        }
+
+
+
 
     }
         break;
@@ -112,5 +122,24 @@ BOOL APIENTRY DllMain( HMODULE hModule,
         break;
     }
     return TRUE;
+}
+
+extern "C" __declspec(dllexport) BOOL WINAPI HookedWriteFile(
+    HANDLE hFile,
+    LPCVOID lpBuffer,
+    DWORD nNumberOfBytesToWrite,
+    LPDWORD lpNumberOfBytesWritten,
+    LPOVERLAPPED lpOverlapped
+)
+{
+    // 원하는 동작 수행
+    MessageBox(NULL, L"Hooked WriteFile!", L"Hook Message", MB_OK);
+    HMODULE hMod = GetModuleHandle(L"kernel32.dll"); 
+    PVOID functionAddress = GetProcAddress(hMod, "WriteFile");
+    //복구
+    memcpy(functionAddress, originBuffer, sizeof(originBuffer));
+    
+    // 원본 WriteFile 함수 호출
+    return WriteFile(hFile, lpBuffer, nNumberOfBytesToWrite, lpNumberOfBytesWritten, lpOverlapped); 
 }
 
