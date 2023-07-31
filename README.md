@@ -6,4 +6,4 @@ x64 inline hooking patch
 mov rax ,address 
 jmp rax
 
-WriteFile 후킹 후 기존 함수 inline hook (x64 Version)
+WriteFile 후킹 후 기존 함수호출 call -> inline hook (x64 Version)
