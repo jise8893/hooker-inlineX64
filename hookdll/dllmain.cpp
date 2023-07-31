@@ -98,10 +98,10 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 
        memcpy(rvaBuffer, (char*)functionAddress + sizeof(BYTE) * 2, sizeof(rvaBuffer));
        rvaValue = unpack_little_endian(rvaBuffer);
-       rvaValue -=12; 
+       rvaValue -=sizeof(originByte); 
        pack32_little_endian(rvaValue, rvaBuffer);
 
-       memcpy(copyBuffer + 2, rvaBuffer, sizeof(rvaBuffer));
+       memcpy(copyBuffer + sizeof(copyBuffer)- sizeof(rvaBuffer), rvaBuffer, sizeof(rvaBuffer));
 
       
 
