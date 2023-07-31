@@ -7,7 +7,7 @@ int main(int argc, char* argv[])
 {
 
 
-    DWORD targetPid = 15868;
+    DWORD targetPid = 22368;
     Hooker* hooker = new Hooker(WDLL_NAME, targetPid);
     
     //hooker->Eject(); 

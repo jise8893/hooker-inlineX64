@@ -3,7 +3,7 @@
 #include <cstdio>
 #include <cstdint>
 
-BYTE originBuffer[6] = { 0, };
+
 
 void pack_little_endian(uint64_t& value, uint8_t* buffer) {
     for (int i = 0; i < 8; i++) {
@@ -11,7 +11,12 @@ void pack_little_endian(uint64_t& value, uint8_t* buffer) {
         value >>= 8;
     }
 }
-
+void pack32_little_endian(uint32_t& value, uint8_t* buffer) {
+    for (int i = 0; i < 4; i++) {
+        buffer[i] = (uint8_t)(value & 0xFF);
+        value >>= 8;
+    }
+}
 // 리틀엔디언 형식으로 패킹된 8바이트 바이트를 64비트 정수로 언패킹하는 함수
 uint64_t unpack_little_endian(const uint8_t* buffer) {
     uint64_t value = 0;
@@ -82,14 +87,36 @@ BOOL APIENTRY DllMain( HMODULE hModule,
        DWORD oldProtect;
 
 
+       // 함수 후킹 건곳에서 12바이트 떨어진 곳에 기존 점프 write [해당위치가 execute가 가능한  메모리로 확인]
+       
+       uint8_t copyBuffer[6];
+       memcpy(copyBuffer, functionAddress, sizeof(copyBuffer));
+
        uint32_t rvaValue = 0;
        uint8_t rvaBuffer[4] = { 0, };
+       uint32_t rvaAddress = 0;
 
+       memcpy(rvaBuffer, (char*)functionAddress + sizeof(BYTE) * 2, sizeof(rvaBuffer));
+       rvaValue = unpack_little_endian(rvaBuffer);
+       rvaValue -=12; 
+       pack32_little_endian(rvaValue, rvaBuffer);
 
-       memcpy(originBuffer, (char*)functionAddress , sizeof(originBuffer)); 
+       memcpy(copyBuffer + 2, rvaBuffer, sizeof(rvaBuffer));
+
       
 
-
+   
+       //Original Function 주소 입력
+       OriginalWriteFile = reinterpret_cast<BOOL(WINAPI*)( 
+           HANDLE hFile, 
+           LPCVOID lpBuffer,  
+           DWORD nNumberOfBytesToWrite, 
+           LPDWORD lpNumberOfBytesWritten, 
+           LPOVERLAPPED lpOverlapped 
+           )>((char*)functionAddress+12); 
+       
+       
+       
 
        if (VirtualProtect(functionAddress, (SIZE_T)12, PAGE_EXECUTE_READWRITE, &oldProtect) == FALSE)
        {
@@ -97,14 +124,17 @@ BOOL APIENTRY DllMain( HMODULE hModule,
            wsprintf(TEXT, L"VirtualProtect Error %d", GetLastError()); 
            MessageBox(NULL, TEXT, NULL, NULL);
        }
-
+       //후킹함수 작성
        if (WriteProcessMemory(GetCurrentProcess(), functionAddress, originByte, sizeof(originByte), NULL))
        {
            MessageBox(NULL,L"WriteProcessMemory Successed", NULL, NULL);
        }
 
-
-
+       //Original function 작성
+       if (WriteProcessMemory(GetCurrentProcess(), (char*)functionAddress+12, copyBuffer, sizeof(copyBuffer), NULL))
+       {
+           MessageBox(NULL, L"WriteProcessMemory2 Successed", NULL, NULL);
+       }
 
     }
         break;
@@ -134,12 +164,8 @@ extern "C" __declspec(dllexport) BOOL WINAPI HookedWriteFile(
 {
     // 원하는 동작 수행
     MessageBox(NULL, L"Hooked WriteFile!", L"Hook Message", MB_OK);
-    HMODULE hMod = GetModuleHandle(L"kernel32.dll"); 
-    PVOID functionAddress = GetProcAddress(hMod, "WriteFile");
-    //복구
-    memcpy(functionAddress, originBuffer, sizeof(originBuffer));
-    
+
     // 원본 WriteFile 함수 호출
-    return WriteFile(hFile, lpBuffer, nNumberOfBytesToWrite, lpNumberOfBytesWritten, lpOverlapped); 
+    return OriginalWriteFile(hFile, lpBuffer, nNumberOfBytesToWrite, lpNumberOfBytesWritten, lpOverlapped);  
 }
 
