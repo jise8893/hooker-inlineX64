@@ -131,7 +131,7 @@ BOOL APIENTRY DllMain( HMODULE hModule,
        }
 
        //Original function 작성
-       if (WriteProcessMemory(GetCurrentProcess(), (char*)functionAddress+12, copyBuffer, sizeof(copyBuffer), NULL))
+       if (WriteProcessMemory(GetCurrentProcess(), (char*)functionAddress+sizeof(originByte), copyBuffer, sizeof(copyBuffer), NULL))
        {
            MessageBox(NULL, L"WriteProcessMemory2 Successed", NULL, NULL);
        }
